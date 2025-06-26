@@ -59,6 +59,8 @@ public:
         TEXTURE_FORMAT DSVFormat = TEX_FORMAT_UNKNOWN;
 
         bool FrontCounterClockwise = false;
+
+        Diligent::COMPARISON_FUNCTION DepthComparison = Diligent::COMPARISON_FUNC_LESS;
     };
 
     /// Initializes the renderer

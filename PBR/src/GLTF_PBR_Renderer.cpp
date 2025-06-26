@@ -120,6 +120,7 @@ GLTF_PBR_Renderer::GLTF_PBR_Renderer(IRenderDevice*     pDevice,
 
         GraphicsDesc.PrimitiveTopology                    = PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
         GraphicsDesc.RasterizerDesc.FrontCounterClockwise = CI.FrontCounterClockwise;
+        GraphicsDesc.DepthStencilDesc.DepthFunc           = CI.DepthComparison;
 
         m_PbrPSOCache = GetPsoCacheAccessor(GraphicsDesc);
 
