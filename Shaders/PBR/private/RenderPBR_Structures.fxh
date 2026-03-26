@@ -13,6 +13,7 @@ struct PBRFrameAttribs
     CameraAttribs               Camera;
     CameraAttribs               PrevCamera; // Previous frame camera used to compute motion vectors
     PBRRendererShaderParameters Renderer;
+    PBRDebugShaderParamters     DebugSettings;
        
 #if defined(PBR_MAX_LIGHTS) && PBR_MAX_LIGHTS > 0    
     PBRLightAttribs Lights[PBR_MAX_LIGHTS];

@@ -43,6 +43,43 @@ struct PBRMaterialBasicAttribs;
 struct PBRLightAttribs;
 } // namespace HLSL
 
+    // Might  be able to make these all the same, double check
+struct shadow_projection_constant_buffer
+{
+    Diligent::float4x4 model;
+    Diligent::float4x4 g_shadow_proj;
+};
+
+struct render_debug_settings
+{
+    bool enable_rendering;          // Do we issue draw calls at all.   For API not the shader
+    bool enable_point_rendering;    // Do we only render the verts.     For API not the shader
+    bool enable_line_rendering;     // Do we only render the lines.     For API not the shader
+    bool enable_triangle_rendering; // Do we render normal triangles.   For API not the shader
+
+    bool enable_lighting;             // Do we apply any lighting or just display diffuse / fallback coloring.
+    bool enable_ambient_lighting;     // Do we apply ambient lighting for min visibility.
+    bool enable_directional_lighting; // Do we apply directional lighting, ie sun.
+    bool enable_specular_lighting;    // Do we apply specular highlighting based on reflection and material type
+
+    bool enable_diffuse_rendering;           // Do we apply any diffuse or just display fallback color.
+    bool enable_diffuse_vertcolor_rendering; // Do we apply vert color to output
+    bool enable_diffuse_texture_rendering;   // Do we apply the diffuse texture to output
+
+    bool enable_specular_as_color_rendering; // Do we render the specular map out as color for debugging.
+    bool enable_normal_as_color_rendering;   // Do we render the normal map out as color for debugging.
+};
+
+
+struct shadow_map_device_resources
+{
+    Diligent::RefCntAutoPtr<Diligent::IShader>                p_vs;
+    Diligent::RefCntAutoPtr<Diligent::IBuffer>                p_vs_cb;
+    Diligent::RefCntAutoPtr<Diligent::IPipelineState>         p_pso;
+    Diligent::RefCntAutoPtr<Diligent::IShaderResourceBinding> p_srb;
+};
+
+
 /// Implementation of a GLTF PBR renderer
 class GLTF_PBR_Renderer : public PBR_Renderer
 {
@@ -146,6 +183,23 @@ public:
                 ModelResourceBindings*       pModelBindings,
                 ResourceCacheBindings*       pCacheBindings = nullptr);
 
+
+    /// Renders a GLTF model into the depth buffer.
+
+    /// \param [in] pCtx           - Device context to record rendering commands to.
+    /// \param [in] GLTFModel      - GLTF model to render.
+    /// \param [in] Transforms     - The model transforms.
+    /// \param [in] pModelBindings - The model's shader resource binding information.
+    /// \param [in] pCacheBindings - Shader resource cache binding information, if the
+    ///                              model has been created using the cache.
+    void RenderDepth(IDeviceContext*              pCtx,
+                const GLTF::Model&           GLTFModel,
+                const GLTF::ModelTransforms& Transforms,
+                const RenderInfo&            RenderParams,
+                ModelResourceBindings*       pModelBindings,
+                ResourceCacheBindings*       pCacheBindings = nullptr);
+
+
     /// Creates resource bindings for a given GLTF model
     ModelResourceBindings CreateResourceBindings(GLTF::Model& GLTFModel,
                                                  IBuffer*     pFrameAttribs);
@@ -244,6 +298,11 @@ public:
     static void* WritePBRMaterialShaderAttribs(void*                               pDstShaderAttribs,
                                                const PBRMaterialShaderAttribsData& AttribsData);
 
+    static void WriteWorldToShadowMapProjectionMatrix(const float4x4& WorldToShadowMapProjectionMatrix)
+    {
+        worldToShadowMapProjectionMatr_ = WorldToShadowMapProjectionMatrix;
+    }
+
     struct PBRLightShaderAttribsData
     {
         const GLTF::Light* Light     = nullptr;
@@ -258,6 +317,9 @@ public:
                                            HLSL::PBRLightAttribs*           pShaderAttribs);
 
     PSO_FLAGS GetMaterialPSOFlags(const GLTF::Material& Mat) const;
+
+   // So we can debug this just like everything else.
+    render_debug_settings m_rendering_debug_settings;
 
 private:
     static ALPHA_MODE GltfAlphaModeToAlphaMode(GLTF::Material::ALPHA_MODE GltfAlphaMode);
@@ -280,6 +342,10 @@ private:
 
     PsoCacheAccessor m_PbrPSOCache;
     PsoCacheAccessor m_WireframePSOCache;
+
+    static float4x4                                         worldToShadowMapProjectionMatr_;
+    _declspec(align(16)) shadow_projection_constant_buffer  vs_shadow_constant_buffer_data_;
+    shadow_map_device_resources                             shadow_map_resources_;
 };
 
 DEFINE_FLAG_ENUM_OPERATORS(GLTF_PBR_Renderer::RenderInfo::ALPHA_MODE_FLAGS)

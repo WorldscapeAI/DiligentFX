@@ -151,6 +151,28 @@ struct PBRRendererShaderParameters
 	CHECK_STRUCT_ALIGNMENT(PBRRendererShaderParameters);
 #endif
 
+struct PBRDebugShaderParamters
+{
+    float lighting_enabled; // Do we apply any lighting or just display diffuse / fallback coloring.
+    float ambient_lighting_enabled; // Do we apply ambient lighting for min visibility.
+    float directional_lighting_enabled; // Do we apply directional lighting, ie sun.
+    float specular_lighting_enabled; // Do we apply specular highlighting based on reflection and material type
+
+    float diffuse_enabled; // Do we apply any diffuse or just display fallback color.
+    float vertcolor_diffuse_enabled; // Do we apply vert color to output
+    float texture_diffuse_enabled; // Do we apply the diffuse texture to output 
+
+    float specular_as_color_enabled; // Do we render the specular map out as color for debugging.
+    float normal_as_color_enabled; // Do we render the normal map out as color for debugging.  
+    float padding0;
+    float padding1;
+    float padding2;
+};
+#ifdef CHECK_STRUCT_ALIGNMENT
+	CHECK_STRUCT_ALIGNMENT(struct PBRDebugShaderParamters
+);
+#endif
+
 struct PBRMaterialBasicAttribs
 {
     float4 BaseColorFactor;

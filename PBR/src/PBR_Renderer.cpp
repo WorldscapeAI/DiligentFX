@@ -2517,6 +2517,7 @@ Uint32 PBR_Renderer::GetPRBFrameAttribsSize(Uint32 LightCount, Uint32 ShadowCast
 {
     return (sizeof(HLSL::CameraAttribs) * 2 +
             sizeof(HLSL::PBRRendererShaderParameters) +
+            sizeof(HLSL::PBRDebugShaderParamters) +
             sizeof(HLSL::PBRLightAttribs) * LightCount +
             sizeof(HLSL::PBRShadowMapInfo) * ShadowCastingLightCount);
 }

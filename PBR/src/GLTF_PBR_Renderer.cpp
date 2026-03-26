@@ -92,6 +92,7 @@ struct PBRRendererCreateInfoWrapper
             UNEXPECTED("Dynamic shader texture arrays are not supported in GLTF renderer");
             CI.ShaderTexturesArrayMode = PBR_Renderer::SHADER_TEXTURE_ARRAY_MODE_NONE;
         }
+
     }
 
     using PBR_RendererCreateInfo = PBR_Renderer::CreateInfo;
@@ -105,6 +106,11 @@ struct PBRRendererCreateInfoWrapper
 };
 
 } // namespace
+
+
+float4x4 GLTF_PBR_Renderer::worldToShadowMapProjectionMatr_;
+
+
 GLTF_PBR_Renderer::GLTF_PBR_Renderer(IRenderDevice*     pDevice,
                                      IRenderStateCache* pStateCache,
                                      IDeviceContext*    pCtx,
@@ -128,6 +134,125 @@ GLTF_PBR_Renderer::GLTF_PBR_Renderer(IRenderDevice*     pDevice,
 
         m_WireframePSOCache = GetPsoCacheAccessor(GraphicsDesc);
     }
+
+
+   // Create shadow pass PSO
+    Diligent::GraphicsPipelineStateCreateInfo ShadowPSOCreateInfo;
+
+    ShadowPSOCreateInfo.PSODesc.Name = "GLFT shadow PSO";
+
+    // This is a graphics pipeline
+    ShadowPSOCreateInfo.PSODesc.PipelineType = Diligent::PIPELINE_TYPE_GRAPHICS;
+
+    // clang-format off
+        // Shadow pass doesn't use any render target outputs
+        ShadowPSOCreateInfo.GraphicsPipeline.NumRenderTargets = 0;
+        ShadowPSOCreateInfo.GraphicsPipeline.RTVFormats[0] = Diligent::TEX_FORMAT_UNKNOWN;
+        // The DSV format is the shadow map format
+        ShadowPSOCreateInfo.GraphicsPipeline.DSVFormat = Diligent::TEX_FORMAT_D16_UNORM;
+        ShadowPSOCreateInfo.GraphicsPipeline.PrimitiveTopology = Diligent::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+        // Cull back faces
+        ShadowPSOCreateInfo.GraphicsPipeline.RasterizerDesc.CullMode = Diligent::CULL_MODE_BACK;
+        // Enable depth testing
+        ShadowPSOCreateInfo.GraphicsPipeline.DepthStencilDesc.DepthEnable = Diligent::True;
+    // clang-format on
+
+
+        static constexpr unsigned int input_element_count = 3;
+        Diligent::LayoutElement       layout_elements[] =
+            {
+                // Attribute 0 - vertex position
+                Diligent::LayoutElement{0, 0, 3, Diligent::VT_FLOAT32, Diligent::False},
+                Diligent::LayoutElement{1, 0, 3, Diligent::VT_FLOAT32, Diligent::False},
+                Diligent::LayoutElement{2, 0, 2, Diligent::VT_FLOAT32, Diligent::False},
+            };
+
+
+    Diligent::ShaderCreateInfo ShadowShaderCI;
+    ShadowShaderCI.pShaderSourceStreamFactory = nullptr;  // Not needed since its txt inline
+    // Tell the system that the shader source code is in HLSL.
+    // For OpenGL, the engine will convert this into GLSL under the hood.
+    ShadowShaderCI.SourceLanguage = Diligent::SHADER_SOURCE_LANGUAGE_HLSL;
+    // OpenGL backend requires emulated combined HLSL texture samplers (g_Texture + g_Texture_sampler combination)
+    ShadowShaderCI.Desc.UseCombinedTextureSamplers = true;
+    // Pack matrices in row-major order
+    ShadowShaderCI.CompileFlags = Diligent::SHADER_COMPILE_FLAG_PACK_MATRIX_ROW_MAJOR;
+
+    // Create shadow vertex shader
+    Diligent::RefCntAutoPtr<Diligent::IShader> pShadowVS;
+    {
+        ShadowShaderCI.Desc.ShaderType = Diligent::SHADER_TYPE_VERTEX;
+        ShadowShaderCI.EntryPoint      = "main";
+        ShadowShaderCI.Desc.Name       = "GLFT Shadow VS";
+        //Code will be inline as that is the way GLTF does it.
+        ShadowShaderCI.Source = R"(
+            cbuffer VSShadowConstants
+            {
+                float4x4 model;
+                float4x4 g_shadow_proj;
+            };
+
+            struct VertexShaderInput
+            {
+                float3 Pos     : ATTRIB0;
+                float3 Normal  : ATTRIB1;
+                float2 UV0     : ATTRIB2;
+            };
+
+            struct PSOutput
+            {
+                float4 Position : SV_POSITION;
+            };
+
+            // Note that if separate shader objects are not supported (this is only the case for old GLES3.0 devices), vertex
+            // shader output variable name must match exactly the name of the pixel shader input variable.
+            // If the variable has structure type (like in this example), the structure declarations must also be identical.
+            void main(in VertexShaderInput VSIn, out PSOutput PSIn)
+            {
+                PSIn.Position = mul(float4(VSIn.Pos, 1.0), model);
+                PSIn.Position = mul(PSIn.Position, g_shadow_proj);
+            }
+        )";
+
+        pDevice->CreateShader(ShadowShaderCI, &shadow_map_resources_.p_vs);
+        CHECK_FATAL_ERR((shadow_map_resources_.p_vs->GetStatus(), "Failed to create shadow vertex shader"));
+    }
+    ShadowPSOCreateInfo.pVS = shadow_map_resources_.p_vs;
+
+    // We don't use pixel shader as we are only interested in populating the depth buffer
+    ShadowPSOCreateInfo.pPS = nullptr;
+
+    ShadowPSOCreateInfo.GraphicsPipeline.InputLayout.LayoutElements = layout_elements;
+    ShadowPSOCreateInfo.GraphicsPipeline.InputLayout.NumElements    = _countof(layout_elements);
+
+    ShadowPSOCreateInfo.PSODesc.ResourceLayout.DefaultVariableType = Diligent::SHADER_RESOURCE_VARIABLE_TYPE_STATIC;
+
+    if (pDevice->GetDeviceInfo().Features.DepthClamp)
+    {
+        // Disable depth clipping to render objects that are closer than near
+        // clipping plane. This is not required for this tutorial, but real applications
+        // will most likely want to do this.
+        ShadowPSOCreateInfo.GraphicsPipeline.RasterizerDesc.DepthClipEnable = Diligent::False;
+    }
+
+    // Create dynamic uniform buffer that will store our transformation matrix
+    // Dynamic buffers can be frequently updated by the CPU
+    {
+        Diligent::BufferDesc cb_desc;
+        cb_desc.Name           = "Shadow VS constants CB";
+        cb_desc.Size           = sizeof(shadow_projection_constant_buffer);
+        cb_desc.Usage          = Diligent::USAGE_DYNAMIC;
+        cb_desc.BindFlags      = Diligent::BIND_UNIFORM_BUFFER;
+        cb_desc.CPUAccessFlags = Diligent::CPU_ACCESS_WRITE;
+        pDevice->CreateBuffer(cb_desc, nullptr, &shadow_map_resources_.p_vs_cb);
+        CHECK_FATAL_ERR(shadow_map_resources_.p_vs_cb, "Failed to create shadow VS constant buffer");
+    }
+
+    pDevice->CreateGraphicsPipelineState(ShadowPSOCreateInfo, &shadow_map_resources_.p_pso);
+    shadow_map_resources_.p_pso->GetStaticVariableByName(Diligent::SHADER_TYPE_VERTEX, "VSShadowConstants")->Set(shadow_map_resources_.p_vs_cb);
+    shadow_map_resources_.p_pso->CreateShaderResourceBinding(&shadow_map_resources_.p_srb, true);
+
+
 }
 
 static RefCntAutoPtr<ITextureView> GetPBRTextureSRV(ITexture*                                           pTexture,
@@ -765,6 +890,128 @@ void GLTF_PBR_Renderer::Render(IDeviceContext*              pCtx,
                 pCurrMaterial = &material;
             }
 
+            if (m_rendering_debug_settings.enable_rendering)
+            {
+                if (primitive.HasIndices())
+                {
+                    DrawIndexedAttribs drawAttrs{primitive.IndexCount, VT_UINT32, DRAW_FLAG_VERIFY_ALL};
+                    drawAttrs.FirstIndexLocation = FirstIndexLocation + primitive.FirstIndex;
+                    drawAttrs.BaseVertex         = BaseVertex;
+                    pCtx->DrawIndexed(drawAttrs);
+                }
+                else
+                {
+                    DrawAttribs drawAttrs{primitive.VertexCount, DRAW_FLAG_VERIFY_ALL};
+                    drawAttrs.StartVertexLocation = BaseVertex;
+                    pCtx->Draw(drawAttrs);
+                }
+            }
+        }
+    }
+}
+
+                               
+
+
+void GLTF_PBR_Renderer::RenderDepth(IDeviceContext* pCtx, 
+                                    const GLTF::Model& GLTFModel,
+                                    const GLTF::ModelTransforms& Transforms, 
+                                    const RenderInfo&            RenderParams,
+                                    ModelResourceBindings* pModelBindings,
+                                    ResourceCacheBindings* pCacheBindings)
+{
+    DEV_CHECK_ERR((pModelBindings != nullptr) ^ (pCacheBindings != nullptr), "Either model bindings or cache bindings must not be null");
+
+    if (!GLTFModel.CompatibleWithTransforms(Transforms))
+    {
+        DEV_ERROR("Model transforms are incompatible with the model");
+        return;
+    }
+
+    if (pModelBindings != nullptr)
+    {
+        std::array<IBuffer*, 8> pVBs;
+
+        const Uint32 NumVBs = static_cast<Uint32>(GLTFModel.GetVertexBufferCount());
+        int          realNumVBs = 0;
+        VERIFY_EXPR(NumVBs <= pVBs.size());
+        for (Uint32 i = 0; i < NumVBs; ++i)
+        {
+            pVBs[i] = GLTFModel.GetVertexBuffer(i); 
+            if (pVBs[i] != nullptr)
+                ++realNumVBs;
+        }
+
+        // This is very dumb, but GetVertexBufferCount() can return more buffers than actually exist in the model, and some of them can be null. 
+        // This is because the vertex buffer layout is determined by the vertex attributes used in the model, and some attributes can be disabled. 
+        // For example, if the model does not use vertex tangents, the buffer for tangents will still be reserved but will be null. 
+        // We should ideally fix this in the GLTF::Model class, but for now we just need to filter out null buffers here to avoid crashing when setting vertex buffers.
+
+        pCtx->SetVertexBuffers(0, realNumVBs, pVBs.data(), nullptr, RESOURCE_STATE_TRANSITION_MODE_TRANSITION, SET_VERTEX_BUFFERS_FLAG_RESET);
+
+        if (IBuffer* pIndexBuffer = GLTFModel.GetIndexBuffer())
+        {
+            pCtx->SetIndexBuffer(pIndexBuffer, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+        }
+    }
+
+    for (std::vector<PrimitiveRenderInfo>& List : m_RenderLists)
+        List.clear();
+
+    // For shadow casting, it will always be zero.
+    const GLTF::Scene& Scene = GLTFModel.Scenes[0];
+
+    // Filter out everything translucent.
+    for (const GLTF::Node* pNode : Scene.LinearNodes)
+    {
+        VERIFY_EXPR(pNode != nullptr);
+        if (pNode->pMesh == nullptr)
+            continue;
+
+        for (const GLTF::Primitive& primitive : pNode->pMesh->Primitives)
+        {
+            if (primitive.VertexCount == 0 && primitive.IndexCount == 0)
+                continue;
+
+            const GLTF::Material& Material  = GLTFModel.Materials[primitive.MaterialId];
+            const int             AlphaMode = Material.Attribs.AlphaMode;
+            if (AlphaMode != ALPHA_MODE_OPAQUE)
+                continue;
+
+            m_RenderLists[0].emplace_back(primitive, *pNode);
+        }
+    }
+
+    const Uint32 FirstIndexLocation = GLTFModel.GetFirstIndexLocation();
+    const Uint32 BaseVertex         = GLTFModel.GetBaseVertex();
+
+    IPipelineState*         pCurrPSO = shadow_map_resources_.p_pso;
+    IShaderResourceBinding* pCurrSRB = shadow_map_resources_.p_srb;
+
+    const std::vector<PrimitiveRenderInfo>& RenderList = m_RenderLists[0];
+    for (const PrimitiveRenderInfo& PrimRI : RenderList)
+    {
+        const GLTF::Node&      Node                 = PrimRI.Node;
+        const GLTF::Primitive& primitive            = PrimRI.Primitive;
+        const float4x4&        NodeGlobalMatrix     = Transforms.NodeGlobalMatrices[Node.Index];
+
+        const float4x4 NodeTransform = NodeGlobalMatrix * RenderParams.ModelTransform;
+        vs_shadow_constant_buffer_data_.model         = NodeTransform;
+        vs_shadow_constant_buffer_data_.g_shadow_proj = worldToShadowMapProjectionMatr_;
+
+        {
+            // Map the model and shadow map UV transform constants
+            Diligent::MapHelper<shadow_projection_constant_buffer> cb_constants(pCtx, shadow_map_resources_.p_vs_cb, Diligent::MAP_WRITE, Diligent::MAP_FLAG_DISCARD);
+            *cb_constants = vs_shadow_constant_buffer_data_;
+        }
+
+        // Set the pipeline state
+        pCtx->SetPipelineState(pCurrPSO);
+        pCtx->CommitShaderResources(pCurrSRB, RESOURCE_STATE_TRANSITION_MODE_VERIFY);
+
+
+        if (m_rendering_debug_settings.enable_rendering)
+        {
             if (primitive.HasIndices())
             {
                 DrawIndexedAttribs drawAttrs{primitive.IndexCount, VT_UINT32, DRAW_FLAG_VERIFY_ALL};
@@ -781,6 +1028,7 @@ void GLTF_PBR_Renderer::Render(IDeviceContext*              pCtx,
         }
     }
 }
+
 
 template <typename ShaderStructType, typename HostStructType>
 Uint8* WriteShaderAttribs(Uint8* pDstPtr, HostStructType* pSrc, const char* DebugName)

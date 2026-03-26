@@ -418,11 +418,30 @@ float GetOITTransmittance(float Depth, uint2 Pos)
 }
 #endif
 
-PSOutput main(in VSOutput VSOut,
-              in bool     IsFrontFace : SV_IsFrontFace)
+PSOutput main(in VSOutput VSOut, in bool IsFrontFace : SV_IsFrontFace)
 {
-    float4 BaseColor = GetBaseColor(VSOut, g_Material, g_Frame.Renderer.MipBias, PRIMITIVE.FallbackColor);
+	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// Material Calculation    
+    float4 final_diffuse_color = { 1.0f, 1.0f, 1.0f, 1.0f };
+    float4 vector_of_one = { 1.0f, 1.0f, 1.0f, 1.0f };
 
+    // Get diffuse texture color or fallback if texture is not enabled or not present. 
+    float4 BaseColor = GetBaseColor(VSOut, g_Material, g_Frame.Renderer.MipBias, PRIMITIVE.FallbackColor);
+    
+    // Mult in vert color    
+    final_diffuse_color = final_diffuse_color * (1 - g_Frame.DebugSettings.vertcolor_diffuse_enabled) + final_diffuse_color * BaseColor * g_Frame.DebugSettings.vertcolor_diffuse_enabled;
+    
+    // Mult in textures
+    final_diffuse_color = final_diffuse_color * (1 - g_Frame.DebugSettings.texture_diffuse_enabled) + final_diffuse_color * BaseColor * g_Frame.DebugSettings.texture_diffuse_enabled;
+    
+  	// Decide if we are 1,1,1 or all calculated diffuse
+    final_diffuse_color = vector_of_one * (1 - g_Frame.DebugSettings.diffuse_enabled) + final_diffuse_color * g_Frame.DebugSettings.diffuse_enabled;
+    
+    // Reset it back to for the rest of the code
+    BaseColor = final_diffuse_color;
+    
+    
+    
 #if USE_VERTEX_NORMALS
     float3 MeshNormal = VSOut.Normal;
 #else
@@ -512,6 +531,14 @@ PSOutput main(in VSOutput VSOut,
 #       endif
         
         OutColor.rgb = ResolveLighting(Shading, SrfLighting);
+        
+        ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	    // Lighting Calculation
+        
+       	// Decide if we are 1,1,1 or all calculated lighting value
+        OutColor.rgb = final_diffuse_color.rgb * (1 - g_Frame.DebugSettings.lighting_enabled) + OutColor.rgb * g_Frame.DebugSettings.lighting_enabled;
+        
+        
 #       if ENABLE_TRANSMISSION
         {
             OutColor.a = 1.0 - Shading.Transmission;
@@ -641,7 +668,7 @@ PSOutput main(in VSOutput VSOut,
         OutColor.rgb = FastLinearToSRGB(OutColor.rgb);
     }
 #endif
-
+   
 #include "PSMainFooter.generated"
 //     PSOutput PSOut;
 //     PSOut.Color = OutColor;
