@@ -1016,13 +1016,13 @@ void GLTF_PBR_Renderer::RenderDepth(IDeviceContext* pCtx,
             {
                 DrawIndexedAttribs drawAttrs{primitive.IndexCount, VT_UINT32, DRAW_FLAG_VERIFY_ALL};
                 drawAttrs.FirstIndexLocation = FirstIndexLocation + primitive.FirstIndex;
-                drawAttrs.BaseVertex         = BaseVertex;
+                drawAttrs.BaseVertex         = BaseVertex + primitive.FirstVertex;
                 pCtx->DrawIndexed(drawAttrs);
             }
             else
             {
                 DrawAttribs drawAttrs{primitive.VertexCount, DRAW_FLAG_VERIFY_ALL};
-                drawAttrs.StartVertexLocation = BaseVertex;
+                drawAttrs.StartVertexLocation = BaseVertex + primitive.FirstVertex;
                 pCtx->Draw(drawAttrs);
             }
         }

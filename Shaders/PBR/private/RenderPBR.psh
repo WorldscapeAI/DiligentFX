@@ -651,7 +651,7 @@ PSOutput main(in VSOutput VSOut, in bool IsFrontFace : SV_IsFrontFace)
         if (Factor > 0.0)
         {
             float4 LoadingAnimationColor = GetLoadingAnimationColor(Shading.Pos, Factor);
-            OutColor = lerp(OutColor, float4(LoadingAnimationColor.rgb, 1.0), LoadingAnimationColor.a);
+            OutColor = lerp(OutColor, float4(LoadingAnimationColor.rgb, 0.0), LoadingAnimationColor.a);
         }
     }
 #endif
@@ -659,8 +659,8 @@ PSOutput main(in VSOutput VSOut, in bool IsFrontFace : SV_IsFrontFace)
     OutColor.rgb *= Transmittance;
     if (BasicAttribs.AlphaMode != PBR_ALPHA_MODE_BLEND)
     {
-        // Write 0 alpha to indicate full opacity
-        OutColor.a = 0.0;
+        // Write 1.0 alpha to indicate full opacity
+        OutColor.a = 1.0;
     }
  
 #if CONVERT_OUTPUT_TO_SRGB

@@ -1,5 +1,5 @@
 /*
- *  Copyright 2023-2025 Diligent Graphics LLC
+ *  Copyright 2023-2026 Diligent Graphics LLC
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -52,6 +52,8 @@ struct EnvMapRenderer::EnvMapShaderAttribs
     float MipLevel      = 0.f;
     float Alpha         = 0.f;
     float Padding       = 0.f;
+
+    float4 Scale{1, 1, 1, 1};
 };
 
 EnvMapRenderer::EnvMapRenderer(const CreateInfo& CI) :
@@ -227,16 +229,18 @@ void EnvMapRenderer::Prepare(IDeviceContext*                 pContext,
         if (std::memcmp(&m_ShaderAttribs->ToneMapping, &ToneMapping, sizeof(ToneMapping)) != 0 ||
             m_ShaderAttribs->AverageLogLum != Attribs.AverageLogLum ||
             m_ShaderAttribs->MipLevel != Attribs.MipLevel ||
-            m_ShaderAttribs->Alpha != Attribs.Alpha)
+            m_ShaderAttribs->Alpha != Attribs.Alpha ||
+            m_ShaderAttribs->Scale != float4{Attribs.Scale, 1})
         {
             m_ShaderAttribs->ToneMapping   = ToneMapping;
             m_ShaderAttribs->AverageLogLum = Attribs.AverageLogLum;
             m_ShaderAttribs->MipLevel      = Attribs.MipLevel;
             m_ShaderAttribs->Alpha         = Attribs.Alpha;
+            m_ShaderAttribs->Scale         = float4{Attribs.Scale, 1};
 
             pContext->UpdateBuffer(m_RenderAttribsCB, 0, sizeof(EnvMapShaderAttribs), m_ShaderAttribs.get(), RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
             StateTransitionDesc Barrier{m_RenderAttribsCB, RESOURCE_STATE_UNKNOWN, RESOURCE_STATE_CONSTANT_BUFFER, STATE_TRANSITION_FLAG_UPDATE_STATE};
-            pContext->TransitionResourceStates(1, &Barrier);
+            pContext->TransitionResourceState(Barrier);
         }
     }
     else
@@ -247,6 +251,7 @@ void EnvMapRenderer::Prepare(IDeviceContext*                 pContext,
             EnvMapAttribs->AverageLogLum = Attribs.AverageLogLum;
             EnvMapAttribs->MipLevel      = Attribs.MipLevel;
             EnvMapAttribs->Alpha         = Attribs.Alpha;
+            EnvMapAttribs->Scale         = float4{Attribs.Scale, 1};
         }
     }
 }

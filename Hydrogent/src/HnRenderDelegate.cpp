@@ -1,5 +1,5 @@
 /*
- *  Copyright 2023-2025 Diligent Graphics LLC
+ *  Copyright 2023-2026 Diligent Graphics LLC
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -518,7 +518,7 @@ HnRenderDelegate::HnRenderDelegate(const CreateInfo& CI) :
 
         const RESOURCE_STATE ShadowMapState = m_pDevice->GetDeviceInfo().IsVulkanDevice() ? RESOURCE_STATE_DEPTH_READ : RESOURCE_STATE_SHADER_RESOURCE;
         StateTransitionDesc  Barrier{pDummyShadowMap, RESOURCE_STATE_UNKNOWN, ShadowMapState, STATE_TRANSITION_FLAG_UPDATE_STATE};
-        CI.pContext->TransitionResourceStates(1, &Barrier);
+        CI.pContext->TransitionResourceState(Barrier);
     }
 
     if (m_USDRenderer->GetSettings().OITLayerCount > 0)
@@ -654,7 +654,7 @@ pxr::HdSprim* HnRenderDelegate::CreateSprim(const pxr::TfToken& TypeId,
         HnLight* Light = HnLight::Create(SPrimId, TypeId);
         {
             std::lock_guard<std::mutex> Guard{m_LightsMtx};
-            m_Lights.emplace(Light);
+            m_Lights.emplace(TypeId, Light);
         }
         SPrim = Light;
     }
@@ -710,7 +710,16 @@ void HnRenderDelegate::DestroySprim(pxr::HdSprim* SPrim)
     else if (dynamic_cast<HnLight*>(SPrim) != nullptr)
     {
         std::lock_guard<std::mutex> Guard{m_LightsMtx};
-        m_Lights.erase(static_cast<HnLight*>(SPrim));
+
+        auto it_range = m_Lights.equal_range(static_cast<HnLight*>(SPrim)->GetTypeId());
+        for (auto it = it_range.first; it != it_range.second; ++it)
+        {
+            if (it->second == SPrim)
+            {
+                m_Lights.erase(it);
+                break;
+            }
+        }
     }
 
     delete SPrim;
@@ -901,19 +910,27 @@ void HnRenderDelegate::CommitResources(pxr::HdChangeTracker* tracker)
             std::lock_guard<std::mutex> Guard{m_LightsMtx};
 
             HnLight* DomeLight = nullptr;
-            for (HnLight* pLight : m_Lights)
+
+            auto dome_lights_range = m_Lights.equal_range(pxr::HdPrimTypeTokens->domeLight);
+            for (auto it = dome_lights_range.first; it != dome_lights_range.second; ++it)
             {
-                if (pLight->GetTypeId() == pxr::HdPrimTypeTokens->domeLight)
+                HnLight* pLight = it->second;
+                VERIFY_EXPR(pLight->GetTypeId() == pxr::HdPrimTypeTokens->domeLight);
+
+                if (!pLight->IsVisible())
                 {
-                    if (DomeLight == nullptr)
-                    {
-                        pLight->PrecomputeIBLCubemaps(*this);
-                        DomeLight = pLight;
-                    }
-                    else
-                    {
-                        LOG_WARNING_MESSAGE("Only one dome light is supported. ", pLight->GetId(), " will be ignored");
-                    }
+                    // Skip invisible dome lights
+                    continue;
+                }
+
+                if (DomeLight == nullptr)
+                {
+                    pLight->PrecomputeIBLCubemaps(*this);
+                    DomeLight = pLight;
+                }
+                else
+                {
+                    LOG_WARNING_MESSAGE("Only one dome light is supported. ", pLight->GetId(), " will be ignored");
                 }
             }
             m_LightResourcesVersion = LightResourcesVersion;
