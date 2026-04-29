@@ -148,8 +148,10 @@ GLTF_PBR_Renderer::GLTF_PBR_Renderer(IRenderDevice*     pDevice,
         // Shadow pass doesn't use any render target outputs
         ShadowPSOCreateInfo.GraphicsPipeline.NumRenderTargets = 0;
         ShadowPSOCreateInfo.GraphicsPipeline.RTVFormats[0] = Diligent::TEX_FORMAT_UNKNOWN;
-        // The DSV format is the shadow map format
-        ShadowPSOCreateInfo.GraphicsPipeline.DSVFormat = Diligent::TEX_FORMAT_D16_UNORM;
+        // The DSV format is the shadow map format, this info needs to come from a g_buffer object we pass into the creation 
+		// so the shaders can pull what they need to know.  Also the models should not know enough to be creating shaders. 
+		// This whole thing is inverted the wrong way.  That is the next refactor.
+        ShadowPSOCreateInfo.GraphicsPipeline.DSVFormat = Diligent::TEX_FORMAT_D32_FLOAT;
         ShadowPSOCreateInfo.GraphicsPipeline.PrimitiveTopology = Diligent::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
         // Cull back faces
         ShadowPSOCreateInfo.GraphicsPipeline.RasterizerDesc.CullMode = Diligent::CULL_MODE_BACK;
