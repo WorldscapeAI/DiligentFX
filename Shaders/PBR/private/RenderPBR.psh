@@ -530,6 +530,11 @@ PSOutput main(in VSOutput VSOut, in bool IsFrontFace : SV_IsFrontFace)
         }
 #       endif
         
+        // Gate individual lighting contributions by debug settings
+        SrfLighting.Base.Punctual    *= g_Frame.DebugSettings.directional_lighting_enabled;
+        SrfLighting.Base.DiffuseIBL  *= g_Frame.DebugSettings.ambient_lighting_enabled;
+        SrfLighting.Base.SpecularIBL *= g_Frame.DebugSettings.specular_lighting_enabled;
+
         OutColor.rgb = ResolveLighting(Shading, SrfLighting);
         
         ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
