@@ -344,7 +344,7 @@ private:
     PsoCacheAccessor m_WireframePSOCache;
 
     static float4x4                                         worldToShadowMapProjectionMatr_;
-    _declspec(align(16)) shadow_projection_constant_buffer  vs_shadow_constant_buffer_data_;
+    shadow_projection_constant_buffer                       vs_shadow_constant_buffer_data_;
     shadow_map_device_resources                             shadow_map_resources_;
 };
 
