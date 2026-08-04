@@ -67,6 +67,96 @@ cbuffer cbMaterialAttribs
     PBRMaterialShaderInfo g_Material;
 }
 
+// This layout must match ws::render::renderbase_lights_cb and its light structs.
+struct ws_AmbientLight
+{
+    float3 color;
+    float  kelvin_temperature_;
+    float  intensity_;
+    float  al_padding1;
+    float  al_padding2;
+    float  al_padding3;
+};
+
+struct ws_DirectionalLight
+{
+    float3 color;
+    float  dl_padding1;
+    float3 direction;
+    float  kelvin_temperature_;
+    float  intensity_;
+    float  dl_padding2;
+    float  dl_padding3;
+    float  dl_padding4;
+};
+
+struct ws_PointLight
+{
+    float3 color;
+    float  falloff_start;
+    float  falloff_end;
+    float  pl_padding1;
+    float  pl_padding2;
+    float  pl_padding3;
+    float3 position;
+    float  kelvin_temperature_;
+    float  intensity_;
+    float  padding4;
+    float  padding5;
+    float  padding6;
+};
+
+cbuffer RenderLights
+{
+    ws_AmbientLight ambient;
+    ws_DirectionalLight directional;
+    ws_PointLight points[2];
+
+    uint has_ambient;
+    uint has_directional;
+    uint has_point;
+    uint has_spot;
+    uint has_area;
+    uint num_point_lights;
+    uint rl_padding1;
+    uint rl_padding2;
+}
+
+PBRLightAttribs MakeDirectionalLight()
+{
+    PBRLightAttribs Light = (PBRLightAttribs)0;
+    Light.Type = PBR_LIGHT_TYPE_DIRECTIONAL;
+    Light.DirectionX = directional.direction.x;
+    Light.DirectionY = directional.direction.y;
+    Light.DirectionZ = directional.direction.z;
+    Light.ShadowMapIndex = -1;
+
+    float3 intensity = directional.color * directional.intensity_;
+    Light.IntensityR = intensity.x;
+    Light.IntensityG = intensity.y;
+    Light.IntensityB = intensity.z;
+    return Light;
+}
+
+PBRLightAttribs MakePointLight(in int Index)
+{
+    PBRLightAttribs Light = (PBRLightAttribs)0;
+    Light.Type = PBR_LIGHT_TYPE_POINT;
+    Light.PosX = points[Index].position.x;
+    Light.PosY = points[Index].position.y;
+    Light.PosZ = points[Index].position.z;
+    Light.ShadowMapIndex = -1;
+
+    float3 intensity = points[Index].color * points[Index].intensity_;
+    Light.IntensityR = intensity.x;
+    Light.IntensityG = intensity.y;
+    Light.IntensityB = intensity.z;
+
+    float range = max(points[Index].falloff_end, 0.0);
+    Light.Range4 = range * range * range * range;
+    return Light;
+}
+
 #if ENABLE_SHADOWS
 Texture2DArray<float>  g_ShadowMap;
 SamplerComparisonState g_ShadowMap_sampler;
@@ -497,12 +587,12 @@ PSOutput main(in VSOutput VSOut, in bool IsFrontFace : SV_IsFrontFace)
     {
 #       if defined(PBR_MAX_LIGHTS) && PBR_MAX_LIGHTS > 0
         {
-            int LightCount = min(g_Frame.Renderer.LightCount, PBR_MAX_LIGHTS);
-            for (int i = 0; i < LightCount; ++i)
+            if (has_directional != 0u)
             {
+                PBRLightAttribs DirectionalLight = MakeDirectionalLight();
                 ApplyPunctualLight(
                     Shading,
-                    g_Frame.Lights[i],
+                    DirectionalLight,
 #                   if ENABLE_SHEEN
                         g_SheenAlbedoScalingLUT,
                         g_SheenAlbedoScalingLUT_sampler,
@@ -510,9 +600,31 @@ PSOutput main(in VSOutput VSOut, in bool IsFrontFace : SV_IsFrontFace)
 #                   if ENABLE_SHADOWS
                         g_ShadowMap,
                         g_ShadowMap_sampler,
-                        g_Frame.ShadowMaps[max(g_Frame.Lights[i].ShadowMapIndex, 0)],
+                        g_Frame.ShadowMaps[0],
 #                   endif
                     SrfLighting);
+            }
+
+            if (has_point != 0u)
+            {
+                const uint PointLightCount = min(num_point_lights, 2u);
+                for (uint i = 0u; i < PointLightCount; ++i)
+                {
+                    PBRLightAttribs PointLight = MakePointLight(int(i));
+                    ApplyPunctualLight(
+                        Shading,
+                        PointLight,
+#                       if ENABLE_SHEEN
+                            g_SheenAlbedoScalingLUT,
+                            g_SheenAlbedoScalingLUT_sampler,
+#                       endif
+#                       if ENABLE_SHADOWS
+                            g_ShadowMap,
+                            g_ShadowMap_sampler,
+                            g_Frame.ShadowMaps[0],
+#                       endif
+                        SrfLighting);
+                }
             }
         }
 #       endif
@@ -527,6 +639,13 @@ PSOutput main(in VSOutput VSOut, in bool IsFrontFace : SV_IsFrontFace)
                          g_PreintegratedCharlie, g_PreintegratedCharlie_sampler,
 #                    endif
                      SrfLighting);
+
+            if (has_ambient != 0u)
+            {
+                const float3 AmbientScale = ambient.color * ambient.intensity_;
+                SrfLighting.Base.DiffuseIBL *= AmbientScale;
+                SrfLighting.Base.SpecularIBL *= AmbientScale;
+            }
         }
 #       endif
         
