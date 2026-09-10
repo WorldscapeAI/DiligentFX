@@ -132,7 +132,7 @@ void ShadowMapManager::Initialize(IRenderDevice* pDevice, IRenderStateCache* pSt
 }
 
 void ShadowMapManager::DistributeCascades(const DistributeCascadeInfo& Info,
-                                          ShadowMapAttribs&            ShadowAttribs)
+                                          HLSL::ShadowMapAttribs&      ShadowAttribs)
 {
     VERIFY(Info.pCameraView, "Camera view matrix must not be null");
     VERIFY(Info.pCameraProj, "Camera projection matrix must not be null");
@@ -186,7 +186,7 @@ void ShadowMapManager::DistributeCascades(const DistributeCascadeInfo& Info,
     m_CascadeTransforms.resize(iNumCascades);
     for (int iCascade = 0; iCascade < iNumCascades; ++iCascade)
     {
-        CascadeAttribs& CurrCascade = ShadowAttribs.Cascades[iCascade];
+        HLSL::CascadeAttribs& CurrCascade = ShadowAttribs.Cascades[iCascade];
 
         float  fCascadeNearZ = (iCascade == 0) ? fMainCamNearPlane : ShadowAttribs.fCascadeCamSpaceZEnd[iCascade - 1];
         float& fCascadeFarZ  = ShadowAttribs.fCascadeCamSpaceZEnd[iCascade];
@@ -530,7 +530,7 @@ void ShadowMapManager::InitializeResourceBindings()
     m_BlurVertTech.SRB->GetVariableByName(SHADER_TYPE_PIXEL, "g_tex2DShadowMap")->Set(m_pIntermediateSRV);
 }
 
-void ShadowMapManager::ConvertToFilterable(IDeviceContext* pCtx, const ShadowMapAttribs& ShadowAttribs)
+void ShadowMapManager::ConvertToFilterable(IDeviceContext* pCtx, const HLSL::ShadowMapAttribs& ShadowAttribs)
 {
     if (m_ShadowMode == SHADOW_MODE_VSM || m_ShadowMode == SHADOW_MODE_EVSM2 || m_ShadowMode == SHADOW_MODE_EVSM4)
     {
@@ -569,7 +569,7 @@ void ShadowMapManager::ConvertToFilterable(IDeviceContext* pCtx, const ShadowMap
                     }
                     else
                     {
-                        const CascadeAttribs& Cascade = ShadowAttribs.Cascades[i];
+                        const HLSL::CascadeAttribs& Cascade = ShadowAttribs.Cascades[i];
 
                         float fNDCtoUVScale         = 0.5f;
                         float fFilterWidth          = ShadowAttribs.fFilterWorldSize * Cascade.f4LightSpaceScale.x * fNDCtoUVScale;
