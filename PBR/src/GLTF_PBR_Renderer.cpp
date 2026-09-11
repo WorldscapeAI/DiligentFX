@@ -255,6 +255,21 @@ GLTF_PBR_Renderer::GLTF_PBR_Renderer(IRenderDevice*     pDevice,
     shadow_map_resources_.p_pso->GetStaticVariableByName(Diligent::SHADER_TYPE_VERTEX, "VSShadowConstants")->Set(shadow_map_resources_.p_vs_cb);
     shadow_map_resources_.p_pso->CreateShaderResourceBinding(&shadow_map_resources_.p_srb, true);
 
+    cascaded_shadow_map_resources_.p_vs = shadow_map_resources_.p_vs;
+    {
+        Diligent::BufferDesc cb_desc = shadow_map_resources_.p_vs_cb->GetDesc();
+        cb_desc.Name = "Cascaded shadow VS constants CB";
+        pDevice->CreateBuffer(cb_desc, nullptr, &cascaded_shadow_map_resources_.p_vs_cb);
+        CHECK_FATAL_ERR(cascaded_shadow_map_resources_.p_vs_cb, "Failed to create cascaded shadow VS constant buffer");
+    }
+
+    ShadowPSOCreateInfo.PSODesc.Name = "GLTF cascaded shadow PSO";
+    ShadowPSOCreateInfo.GraphicsPipeline.RasterizerDesc.DepthClipEnable = Diligent::True;
+    ShadowPSOCreateInfo.GraphicsPipeline.DepthStencilDesc.DepthFunc = Diligent::COMPARISON_FUNC_LESS_EQUAL;
+    pDevice->CreateGraphicsPipelineState(ShadowPSOCreateInfo, &cascaded_shadow_map_resources_.p_pso);
+    cascaded_shadow_map_resources_.p_pso->GetStaticVariableByName(Diligent::SHADER_TYPE_VERTEX, "VSShadowConstants")
+        ->Set(cascaded_shadow_map_resources_.p_vs_cb);
+    cascaded_shadow_map_resources_.p_pso->CreateShaderResourceBinding(&cascaded_shadow_map_resources_.p_srb, true);
 
 }
 
@@ -923,6 +938,27 @@ void GLTF_PBR_Renderer::RenderDepth(IDeviceContext* pCtx,
                                     ModelResourceBindings* pModelBindings,
                                     ResourceCacheBindings* pCacheBindings)
 {
+    RenderDepthWithResources(pCtx, GLTFModel, Transforms, RenderParams, pModelBindings, pCacheBindings, shadow_map_resources_);
+}
+
+void GLTF_PBR_Renderer::RenderCascadedShadow(IDeviceContext*              pCtx,
+                                             const GLTF::Model&           GLTFModel,
+                                             const GLTF::ModelTransforms& Transforms,
+                                             const RenderInfo&            RenderParams,
+                                             ModelResourceBindings*       pModelBindings,
+                                             ResourceCacheBindings*       pCacheBindings)
+{
+    RenderDepthWithResources(pCtx, GLTFModel, Transforms, RenderParams, pModelBindings, pCacheBindings, cascaded_shadow_map_resources_);
+}
+
+void GLTF_PBR_Renderer::RenderDepthWithResources(IDeviceContext*              pCtx,
+                                                 const GLTF::Model&           GLTFModel,
+                                                 const GLTF::ModelTransforms& Transforms,
+                                                 const RenderInfo&            RenderParams,
+                                                 ModelResourceBindings*       pModelBindings,
+                                                 ResourceCacheBindings*       pCacheBindings,
+                                                 shadow_map_device_resources& resources)
+{
     DEV_CHECK_ERR((pModelBindings != nullptr) ^ (pCacheBindings != nullptr), "Either model bindings or cache bindings must not be null");
 
     if (!GLTFModel.CompatibleWithTransforms(Transforms))
@@ -988,8 +1024,8 @@ void GLTF_PBR_Renderer::RenderDepth(IDeviceContext* pCtx,
     const Uint32 FirstIndexLocation = GLTFModel.GetFirstIndexLocation();
     const Uint32 BaseVertex         = GLTFModel.GetBaseVertex();
 
-    IPipelineState*         pCurrPSO = shadow_map_resources_.p_pso;
-    IShaderResourceBinding* pCurrSRB = shadow_map_resources_.p_srb;
+    IPipelineState*         pCurrPSO = resources.p_pso;
+    IShaderResourceBinding* pCurrSRB = resources.p_srb;
 
     const std::vector<PrimitiveRenderInfo>& RenderList = m_RenderLists[0];
     for (const PrimitiveRenderInfo& PrimRI : RenderList)
@@ -1004,7 +1040,7 @@ void GLTF_PBR_Renderer::RenderDepth(IDeviceContext* pCtx,
 
         {
             // Map the model and shadow map UV transform constants
-            Diligent::MapHelper<shadow_projection_constant_buffer> cb_constants(pCtx, shadow_map_resources_.p_vs_cb, Diligent::MAP_WRITE, Diligent::MAP_FLAG_DISCARD);
+            Diligent::MapHelper<shadow_projection_constant_buffer> cb_constants(pCtx, resources.p_vs_cb, Diligent::MAP_WRITE, Diligent::MAP_FLAG_DISCARD);
             *cb_constants = vs_shadow_constant_buffer_data_;
         }
 

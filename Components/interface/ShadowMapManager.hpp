@@ -44,7 +44,10 @@
 namespace Diligent
 {
 
+namespace HLSL
+{
 #include "Shaders/Common/public/BasicStructures.fxh"
+} // namespace HLSL
 
 /// Shadow map manager.
 class ShadowMapManager
@@ -162,11 +165,10 @@ public:
     };
 
     /// Distributes shadow cascades.
-    void DistributeCascades(const DistributeCascadeInfo& Info,
-                            ShadowMapAttribs&            shadowMapAttribs);
+    void DistributeCascades(const DistributeCascadeInfo& Info, HLSL::ShadowMapAttribs& shadowMapAttribs);
 
     /// Converts the shadow map to filterable format.
-    void ConvertToFilterable(IDeviceContext* pCtx, const ShadowMapAttribs& ShadowAttribs);
+    void ConvertToFilterable(IDeviceContext* pCtx, const HLSL::ShadowMapAttribs& ShadowAttribs);
 
     /// Returns the cascade transforms for the specified cascade.
     const CascadeTransforms& GetCascadeTransform(Uint32 Cascade) const { return m_CascadeTransforms[Cascade]; }

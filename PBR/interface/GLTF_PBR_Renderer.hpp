@@ -199,6 +199,13 @@ public:
                 ModelResourceBindings*       pModelBindings,
                 ResourceCacheBindings*       pCacheBindings = nullptr);
 
+    void RenderCascadedShadow(IDeviceContext*              pCtx,
+                              const GLTF::Model&           GLTFModel,
+                              const GLTF::ModelTransforms& Transforms,
+                              const RenderInfo&            RenderParams,
+                              ModelResourceBindings*       pModelBindings,
+                              ResourceCacheBindings*       pCacheBindings = nullptr);
+
 
     /// Creates resource bindings for a given GLTF model
     ModelResourceBindings CreateResourceBindings(GLTF::Model& GLTFModel,
@@ -303,6 +310,11 @@ public:
         worldToShadowMapProjectionMatr_ = WorldToShadowMapProjectionMatrix;
     }
 
+    static void WriteWorldToCascadedShadowMapProjectionMatrix(const float4x4& WorldToShadowMapProjectionMatrix)
+    {
+        WriteWorldToShadowMapProjectionMatrix(WorldToShadowMapProjectionMatrix);
+    }
+
     struct PBRLightShaderAttribsData
     {
         const GLTF::Light* Light     = nullptr;
@@ -323,6 +335,14 @@ public:
 
 private:
     static ALPHA_MODE GltfAlphaModeToAlphaMode(GLTF::Material::ALPHA_MODE GltfAlphaMode);
+
+    void RenderDepthWithResources(IDeviceContext*              pCtx,
+                                  const GLTF::Model&           GLTFModel,
+                                  const GLTF::ModelTransforms& Transforms,
+                                  const RenderInfo&            RenderParams,
+                                  ModelResourceBindings*       pModelBindings,
+                                  ResourceCacheBindings*       pCacheBindings,
+                                  shadow_map_device_resources& resources);
 
 private:
     RenderInfo m_RenderParams;
@@ -346,6 +366,7 @@ private:
     static float4x4                                         worldToShadowMapProjectionMatr_;
     shadow_projection_constant_buffer                       vs_shadow_constant_buffer_data_;
     shadow_map_device_resources                             shadow_map_resources_;
+    shadow_map_device_resources                             cascaded_shadow_map_resources_;
 };
 
 DEFINE_FLAG_ENUM_OPERATORS(GLTF_PBR_Renderer::RenderInfo::ALPHA_MODE_FLAGS)
