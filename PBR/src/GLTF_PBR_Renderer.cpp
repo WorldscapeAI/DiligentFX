@@ -822,7 +822,7 @@ void GLTF_PBR_Renderer::Render(IDeviceContext*              pCtx,
             }
 
             size_t JointCount = 0;
-            if (Node.SkinTransformsIndex >= 0 && Node.SkinTransformsIndex < static_cast<int>(Transforms.Skins.size()))
+            if (Node.SkinTransformsIndex >= 0 && Node.SkinTransformsIndex < static_cast<int>(Transforms.Skins.size()) && Node.SkinTransformsIndex < static_cast<int>(PrevTransforms->Skins.size()))
             {
                 const std::vector<float4x4>& JointMatrices = Transforms.Skins[Node.SkinTransformsIndex].JointMatrices;
 
