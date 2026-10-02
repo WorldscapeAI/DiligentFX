@@ -427,12 +427,13 @@ PSOutput main(in VSOutput VSOut, in bool IsFrontFace : SV_IsFrontFace)
 
     // Get diffuse texture color or fallback if texture is not enabled or not present. 
     float4 BaseColor = GetBaseColor(VSOut, g_Material, g_Frame.Renderer.MipBias, PRIMITIVE.FallbackColor);
+    final_diffuse_color = BaseColor;
     
     // Mult in vert color    
-    final_diffuse_color = final_diffuse_color * (1 - g_Frame.DebugSettings.vertcolor_diffuse_enabled) + final_diffuse_color * BaseColor * g_Frame.DebugSettings.vertcolor_diffuse_enabled;
+    // final_diffuse_color = final_diffuse_color * (1 - g_Frame.DebugSettings.vertcolor_diffuse_enabled) + final_diffuse_color * BaseColor * g_Frame.DebugSettings.vertcolor_diffuse_enabled;
     
     // Mult in textures
-    final_diffuse_color = final_diffuse_color * (1 - g_Frame.DebugSettings.texture_diffuse_enabled) + final_diffuse_color * BaseColor * g_Frame.DebugSettings.texture_diffuse_enabled;
+    // final_diffuse_color = final_diffuse_color * (1 - g_Frame.DebugSettings.texture_diffuse_enabled) + final_diffuse_color * BaseColor * g_Frame.DebugSettings.texture_diffuse_enabled;
     
   	// Decide if we are 1,1,1 or all calculated diffuse
     final_diffuse_color = vector_of_one * (1 - g_Frame.DebugSettings.diffuse_enabled) + final_diffuse_color * g_Frame.DebugSettings.diffuse_enabled;
