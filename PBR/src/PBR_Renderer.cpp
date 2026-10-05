@@ -2031,6 +2031,9 @@ void PBR_Renderer::CreatePSO(PsoHashMapType&             PsoHashMap,
         {
             VERIFY(!IsUnshaded, "Unshaded mode should use OpaquePSO. The PSOKey's ctor sets the alpha mode to opaque.");
             RT0.BlendEnable = True;
+            // Do not change this, you will just break alpha again...
+            // We do not yet sort alpha back to front, so not writing out depth matters...
+            GraphicsPipeline.DepthStencilDesc.DepthWriteEnable = False;
             if (OITLayerCount > 0)
             {
                 // Use additive blending for OIT
@@ -2038,8 +2041,6 @@ void PBR_Renderer::CreatePSO(PsoHashMapType&             PsoHashMap,
                 RT0.DestBlend = BLEND_FACTOR_ONE;
                 RT0.BlendOp   = BLEND_OPERATION_ADD;
 
-                // Disable depth writes, but keep depth testing enabled
-                GraphicsPipeline.DepthStencilDesc.DepthWriteEnable = False;
             }
             else
             {
