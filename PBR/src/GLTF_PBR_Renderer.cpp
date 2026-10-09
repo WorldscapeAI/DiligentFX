@@ -639,7 +639,8 @@ void GLTF_PBR_Renderer::Render(IDeviceContext*              pCtx,
                                const GLTF::ModelTransforms* PrevTransforms,
                                const RenderInfo&            RenderParams,
                                ModelResourceBindings*       pModelBindings,
-                               ResourceCacheBindings*       pCacheBindings)
+                               ResourceCacheBindings*       pCacheBindings,
+                               const std::vector<PrimitiveRenderInfo>* pPrimitiveSubmissions)
 {
     static_assert(static_cast<LIGHT_TYPE>(GLTF::Light::TYPE::DIRECTIONAL) == LIGHT_TYPE_DIRECTIONAL, "GLTF::Light::TYPE::DIRECTIONAL != LIGHT_TYPE_DIRECTIONAL");
     static_assert(static_cast<LIGHT_TYPE>(GLTF::Light::TYPE::POINT) == LIGHT_TYPE_POINT, "GLTF::Light::TYPE::POINT != LIGHT_TYPE_POINT");
@@ -704,14 +705,12 @@ void GLTF_PBR_Renderer::Render(IDeviceContext*              pCtx,
     for (std::vector<PrimitiveRenderInfo>& List : m_RenderLists)
         List.clear();
 
-    for (const GLTF::Node* pNode : Scene.LinearNodes)
+    if (pPrimitiveSubmissions != nullptr)
     {
-        VERIFY_EXPR(pNode != nullptr);
-        if (pNode->pMesh == nullptr)
-            continue;
-
-        for (const GLTF::Primitive& primitive : pNode->pMesh->Primitives)
+        for (const PrimitiveRenderInfo& submission : *pPrimitiveSubmissions)
         {
+            const GLTF::Primitive& primitive = submission.Primitive;
+            const GLTF::Node& node = submission.Node;
             if (primitive.VertexCount == 0 && primitive.IndexCount == 0)
                 continue;
 
@@ -720,7 +719,29 @@ void GLTF_PBR_Renderer::Render(IDeviceContext*              pCtx,
             if ((RenderParams.AlphaModes & (1u << AlphaMode)) == 0)
                 continue;
 
-            m_RenderLists[AlphaMode].emplace_back(primitive, *pNode);
+            m_RenderLists[AlphaMode].emplace_back(primitive, node);
+        }
+    }
+    else
+    {
+        for (const GLTF::Node* pNode : Scene.LinearNodes)
+        {
+            VERIFY_EXPR(pNode != nullptr);
+            if (pNode->pMesh == nullptr)
+                continue;
+
+            for (const GLTF::Primitive& primitive : pNode->pMesh->Primitives)
+            {
+                if (primitive.VertexCount == 0 && primitive.IndexCount == 0)
+                    continue;
+
+                const GLTF::Material& Material  = GLTFModel.Materials[primitive.MaterialId];
+                const int             AlphaMode = Material.Attribs.AlphaMode;
+                if ((RenderParams.AlphaModes & (1u << AlphaMode)) == 0)
+                    continue;
+
+                m_RenderLists[AlphaMode].emplace_back(primitive, *pNode);
+            }
         }
     }
 
