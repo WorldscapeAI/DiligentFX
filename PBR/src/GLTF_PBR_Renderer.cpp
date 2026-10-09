@@ -715,6 +715,9 @@ void GLTF_PBR_Renderer::Render(IDeviceContext*              pCtx,
             if (primitive.VertexCount == 0 && primitive.IndexCount == 0)
                 continue;
 
+            if (RenderParams.PrimitiveFilter && !RenderParams.PrimitiveFilter(primitive))
+                continue;
+
             const GLTF::Material& Material  = GLTFModel.Materials[primitive.MaterialId];
             const int             AlphaMode = Material.Attribs.AlphaMode;
             if ((RenderParams.AlphaModes & (1u << AlphaMode)) == 0)

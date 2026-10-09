@@ -29,6 +29,7 @@
 
 #include "PBR_Renderer.hpp"
 
+#include <functional>
 #include <vector>
 #include <array>
 
@@ -141,6 +142,10 @@ public:
         PSO_FLAGS Flags = PSO_FLAG_DEFAULT;
 
         bool Wireframe = false;
+
+        // Optional per-primitive routing hook. Evaluated while building each pass render list;
+        // callers can route shared-model materials without mutating GLTFModel.
+        std::function<bool(const GLTF::Primitive&)> PrimitiveFilter;
     };
 
     /// GLTF Model shader resource binding information
