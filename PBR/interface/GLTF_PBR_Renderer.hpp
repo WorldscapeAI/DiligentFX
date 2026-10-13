@@ -143,6 +143,20 @@ public:
         bool Wireframe = false;
     };
 
+    // A borrowed primitive/node pair used for an explicitly partitioned submission.
+    // The referenced model objects must outlive the Render call.
+    struct PrimitiveRenderInfo
+    {
+        const GLTF::Primitive& Primitive;
+        const GLTF::Node&      Node;
+
+        PrimitiveRenderInfo(const GLTF::Primitive& primitive,
+                            const GLTF::Node&      node) noexcept :
+            Primitive{primitive},
+            Node{node}
+        {}
+    };
+
     /// GLTF Model shader resource binding information
     struct ModelResourceBindings
     {
@@ -181,7 +195,8 @@ public:
                 const GLTF::ModelTransforms* PrevTransforms,
                 const RenderInfo&            RenderParams,
                 ModelResourceBindings*       pModelBindings,
-                ResourceCacheBindings*       pCacheBindings = nullptr);
+                ResourceCacheBindings*       pCacheBindings = nullptr,
+                const std::vector<PrimitiveRenderInfo>* pPrimitiveSubmissions = nullptr);
 
 
     /// Renders a GLTF model into the depth buffer.
@@ -346,18 +361,6 @@ private:
 
 private:
     RenderInfo m_RenderParams;
-
-    struct PrimitiveRenderInfo
-    {
-        const GLTF::Primitive& Primitive;
-        const GLTF::Node&      Node;
-
-        PrimitiveRenderInfo(const GLTF::Primitive& _Primitive,
-                            const GLTF::Node&      _Node) noexcept :
-            Primitive{_Primitive},
-            Node{_Node}
-        {}
-    };
     std::array<std::vector<PrimitiveRenderInfo>, GLTF::Material::ALPHA_MODE_NUM_MODES> m_RenderLists;
 
     PsoCacheAccessor m_PbrPSOCache;
