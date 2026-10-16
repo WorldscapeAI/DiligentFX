@@ -47,6 +47,30 @@ cbuffer cbPrimitiveAttribs
 #endif
 }
 
+#if USE_INSTANCE_TRANSFORMS
+struct GltfInstanceRecord
+{
+    row_major float4x4 World;
+    row_major float4x4 PreviousWorld;
+    row_major float4x4 ModelTransform;
+    float4 BoundingSphere;
+    uint ModelIndex;
+    uint PaletteOffset;
+    uint Flags;
+    uint Reserved;
+};
+
+StructuredBuffer<GltfInstanceRecord> g_GltfInstances;
+
+struct GltfNodeTransformRecord
+{
+    row_major float4x4 World;
+    row_major float4x4 PreviousWorld;
+};
+
+StructuredBuffer<GltfNodeTransformRecord> g_GltfNodeTransforms;
+#endif
+
 
 #if PRIMITIVE_ARRAY_SIZE > 0
 // PRIMITIVE_ID is defined by the host as gl_DrawID or gl_DrawIDARB
@@ -166,6 +190,26 @@ void main(in  VSInput  VSIn,
 
 #if COMPUTE_MOTION_VECTORS
     float4x4 PrevTransform = Primitive.Transforms.PrevNodeMatrix;
+#endif
+
+#if USE_INSTANCE_TRANSFORMS
+    const GltfInstanceRecord Instance = g_GltfInstances[VSIn.InstanceSlot];
+    if ((Instance.Flags & 16u) != 0)
+    {
+        const GltfNodeTransformRecord NodeTransform =
+            g_GltfNodeTransforms[Instance.PaletteOffset + uint(Primitive.Transforms.FirstJoint)];
+        Transform = mul(mul(NodeTransform.World, Instance.ModelTransform), Instance.World);
+#   if COMPUTE_MOTION_VECTORS
+        PrevTransform = mul(mul(NodeTransform.PreviousWorld, Instance.ModelTransform), Instance.PreviousWorld);
+#   endif
+    }
+    else
+    {
+        Transform = mul(Transform, Instance.World);
+#   if COMPUTE_MOTION_VECTORS
+        PrevTransform = mul(PrevTransform, Instance.PreviousWorld);
+#   endif
+    }
 #endif
     
 #if MAX_JOINT_COUNT > 0 && USE_JOINTS

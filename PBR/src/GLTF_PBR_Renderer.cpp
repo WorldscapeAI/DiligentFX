@@ -680,6 +680,14 @@ void GLTF_PBR_Renderer::Render(IDeviceContext*              pCtx,
         }
     }
 
+    if (RenderParams.InstanceSlotBuffer != nullptr)
+    {
+        IBuffer* pInstanceBuffer = RenderParams.InstanceSlotBuffer;
+        const Uint64 InstanceBufferOffset = RenderParams.InstanceBufferByteOffset;
+        pCtx->SetVertexBuffers(8, 1, &pInstanceBuffer, &InstanceBufferOffset,
+                               RESOURCE_STATE_TRANSITION_MODE_TRANSITION, SET_VERTEX_BUFFERS_FLAG_NONE);
+    }
+
     PSO_FLAGS VertexAttribFlags = PSO_FLAG_NONE;
     for (Uint32 i = 0; i < GLTFModel.GetNumVertexAttributes(); ++i)
     {
@@ -776,6 +784,9 @@ void GLTF_PBR_Renderer::Render(IDeviceContext*              pCtx,
 
             PSO_FLAGS PSOFlags = VertexAttribFlags | GetMaterialPSOFlags(material);
 
+            if (m_Settings.EnableInstanceTransforms && RenderParams.InstanceSlotBuffer != nullptr)
+                PSOFlags |= PSO_FLAG_USE_INSTANCE_TRANSFORMS;
+
             // These flags will be filtered out by RenderParams.Flags
             PSOFlags |= PSO_FLAG_USE_TEXTURE_ATLAS |
                 PSO_FLAG_ENABLE_TEXCOORD_TRANSFORM |
@@ -825,7 +836,21 @@ void GLTF_PBR_Renderer::Render(IDeviceContext*              pCtx,
                        "Material index is out of bounds. This most likely indicates that shader resources were initialized for a different model.");
 
                 IShaderResourceBinding* const pSRB = pModelBindings->MaterialSRB[primitive.MaterialId];
-                DEV_CHECK_ERR(pSRB != nullptr, "Unable to find SRB for GLTF material.");
+                VERIFY(pSRB != nullptr, "Unable to find SRB for GLTF material.");
+                if (RenderParams.InstanceSlotBuffer != nullptr)
+                {
+                    IShaderResourceVariable* const pInstances =
+                        pSRB->GetVariableByName(SHADER_TYPE_VERTEX, "g_GltfInstances");
+                    VERIFY(pInstances != nullptr, "Instance transform SRV is missing from the GLTF PBR signature.");
+                    pInstances->Set(RenderParams.InstanceTransforms);
+
+                    IShaderResourceVariable* const pNodeTransforms =
+                        pSRB->GetVariableByName(SHADER_TYPE_VERTEX, "g_GltfNodeTransforms");
+                    VERIFY(pNodeTransforms != nullptr, "Instance node transform SRV is missing from the GLTF PBR signature.");
+                    VERIFY(RenderParams.InstanceNodeTransforms != nullptr,
+                        "Instance node transform SRV was not supplied to the GLTF PBR renderer.");
+                    pNodeTransforms->Set(RenderParams.InstanceNodeTransforms);
+                }
                 if (pCurrSRB != pSRB)
                 {
                     pCurrSRB = pSRB;
@@ -886,6 +911,8 @@ void GLTF_PBR_Renderer::Render(IDeviceContext*              pCtx,
                         &PrevNodeTransform,
                         static_cast<Uint32>(JointCount),
                     };
+                    if (RenderParams.InstanceSlotBuffer != nullptr)
+                        AttribsData.FirstJoint = static_cast<Uint32>(Node.Index);
                     void* pEndPtr = WritePBRPrimitiveShaderAttribs(pAttribsData, AttribsData, !m_Settings.PackMatrixRowMajor, m_Settings.UseSkinPreTransform);
 
                     VERIFY(reinterpret_cast<uint8_t*>(pEndPtr) <= static_cast<uint8_t*>(pAttribsData) + m_PBRPrimitiveAttribsCB->GetDesc().Size,
@@ -936,12 +963,16 @@ void GLTF_PBR_Renderer::Render(IDeviceContext*              pCtx,
                     DrawIndexedAttribs drawAttrs{primitive.IndexCount, VT_UINT32, DRAW_FLAG_VERIFY_ALL};
                     drawAttrs.FirstIndexLocation = FirstIndexLocation + primitive.FirstIndex;
                     drawAttrs.BaseVertex         = BaseVertex;
+                    if (RenderParams.InstanceSlotBuffer != nullptr)
+                        drawAttrs.NumInstances = RenderParams.InstanceCount;
                     pCtx->DrawIndexed(drawAttrs);
                 }
                 else
                 {
                     DrawAttribs drawAttrs{primitive.VertexCount, DRAW_FLAG_VERIFY_ALL};
                     drawAttrs.StartVertexLocation = BaseVertex;
+                    if (RenderParams.InstanceSlotBuffer != nullptr)
+                        drawAttrs.NumInstances = RenderParams.InstanceCount;
                     pCtx->Draw(drawAttrs);
                 }
             }

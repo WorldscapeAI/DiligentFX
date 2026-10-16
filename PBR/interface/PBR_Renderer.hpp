@@ -213,6 +213,9 @@ public:
         /// Whether to use skin pre-transform before applying joint transformations.
         bool UseSkinPreTransform = false;
 
+        /// Whether to expose the GLTF instance-record resource to PBR vertex shaders.
+        bool EnableInstanceTransforms = false;
+
         /// Whether vertex normals are packed into a single 32-bit uint, see PackVertexNormal().
         bool PackVertexNormals = false;
 
@@ -551,6 +554,8 @@ public:
         PSO_FLAG_LAST = PSO_FLAG_ENABLE_SHADOWS,
 
         PSO_FLAG_FIRST_USER_DEFINED = PSO_FLAG_LAST << 1ull,
+
+        PSO_FLAG_USE_INSTANCE_TRANSFORMS = PSO_FLAG_FIRST_USER_DEFINED,
 
         PSO_FLAG_VERTEX_ATTRIBS =
             PSO_FLAG_USE_VERTEX_COLORS |

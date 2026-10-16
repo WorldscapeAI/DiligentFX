@@ -1075,6 +1075,12 @@ void PBR_Renderer::CreateSignature()
         SignatureDesc.AddResource(SHADER_TYPE_VERTEX, GetJointTransformsVarName(), JointsBufferResType, SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE);
     }
 
+    if (m_Settings.EnableInstanceTransforms)
+    {
+        SignatureDesc.AddResource(SHADER_TYPE_VERTEX, "g_GltfInstances", SHADER_RESOURCE_TYPE_BUFFER_SRV, SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE);
+        SignatureDesc.AddResource(SHADER_TYPE_VERTEX, "g_GltfNodeTransforms", SHADER_RESOURCE_TYPE_BUFFER_SRV, SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE);
+    }
+
     std::unordered_set<std::string> Samplers;
     if (!m_Device.GetDeviceInfo().IsGLDevice())
     {
@@ -1303,6 +1309,7 @@ ShaderMacroHelper PBR_Renderer::DefineMacros(const PSOKey& Key) const
     Macros.Add("JOINTS_BUFFER_MODE", static_cast<int>(m_Settings.JointsBufferMode));
 
     Macros.Add("USE_SKIN_PRE_TRANSFORM", m_Settings.UseSkinPreTransform);
+    Macros.Add("USE_INSTANCE_TRANSFORMS", (PSOFlags & PSO_FLAG_USE_INSTANCE_TRANSFORMS) != 0);
     Macros.Add("PACK_VERTEX_NORMALS", m_Settings.PackVertexNormals);
     Macros.Add("TONE_MAPPING_MODE", "TONE_MAPPING_MODE_UNCHARTED2");
 
@@ -1675,6 +1682,15 @@ void PBR_Renderer::GetVSInputStructAndLayout(PSO_FLAGS         PSOFlags,
                 }
             }
         }
+    }
+
+    if ((PSOFlags & PSO_FLAG_USE_INSTANCE_TRANSFORMS) != 0)
+    {
+        constexpr Uint32 InstanceAttributeIndex = 8;
+        constexpr Uint32 InstanceBufferSlot = 8;
+        InputLayout.Add(LayoutElement{"ATTRIB", InstanceAttributeIndex, InstanceBufferSlot, 1, VT_UINT32,
+            False, 0, sizeof(Uint32), INPUT_ELEMENT_FREQUENCY_PER_INSTANCE, 1});
+        ss << "    uint InstanceSlot : ATTRIB" << InstanceAttributeIndex << ";" << std::endl;
     }
 
     if (m_Settings.PrimitiveArraySize > 0 && !m_Device.GetDeviceInfo().Features.NativeMultiDraw)
