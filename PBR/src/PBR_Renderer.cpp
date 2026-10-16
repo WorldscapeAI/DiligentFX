@@ -1076,7 +1076,10 @@ void PBR_Renderer::CreateSignature()
     }
 
     if (m_Settings.EnableInstanceTransforms)
+    {
         SignatureDesc.AddResource(SHADER_TYPE_VERTEX, "g_GltfInstances", SHADER_RESOURCE_TYPE_BUFFER_SRV, SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE);
+        SignatureDesc.AddResource(SHADER_TYPE_VERTEX, "g_GltfNodeTransforms", SHADER_RESOURCE_TYPE_BUFFER_SRV, SHADER_RESOURCE_VARIABLE_TYPE_MUTABLE);
+    }
 
     std::unordered_set<std::string> Samplers;
     if (!m_Device.GetDeviceInfo().IsGLDevice())

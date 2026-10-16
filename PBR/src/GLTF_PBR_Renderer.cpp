@@ -837,12 +837,19 @@ void GLTF_PBR_Renderer::Render(IDeviceContext*              pCtx,
 
                 IShaderResourceBinding* const pSRB = pModelBindings->MaterialSRB[primitive.MaterialId];
                 VERIFY(pSRB != nullptr, "Unable to find SRB for GLTF material.");
-                if (RenderParams.InstanceTransforms != nullptr)
+                if (RenderParams.InstanceSlotBuffer != nullptr)
                 {
                     IShaderResourceVariable* const pInstances =
                         pSRB->GetVariableByName(SHADER_TYPE_VERTEX, "g_GltfInstances");
                     VERIFY(pInstances != nullptr, "Instance transform SRV is missing from the GLTF PBR signature.");
                     pInstances->Set(RenderParams.InstanceTransforms);
+
+                    IShaderResourceVariable* const pNodeTransforms =
+                        pSRB->GetVariableByName(SHADER_TYPE_VERTEX, "g_GltfNodeTransforms");
+                    VERIFY(pNodeTransforms != nullptr, "Instance node transform SRV is missing from the GLTF PBR signature.");
+                    VERIFY(RenderParams.InstanceNodeTransforms != nullptr,
+                        "Instance node transform SRV was not supplied to the GLTF PBR renderer.");
+                    pNodeTransforms->Set(RenderParams.InstanceNodeTransforms);
                 }
                 if (pCurrSRB != pSRB)
                 {
@@ -904,6 +911,8 @@ void GLTF_PBR_Renderer::Render(IDeviceContext*              pCtx,
                         &PrevNodeTransform,
                         static_cast<Uint32>(JointCount),
                     };
+                    if (RenderParams.InstanceSlotBuffer != nullptr)
+                        AttribsData.FirstJoint = static_cast<Uint32>(Node.Index);
                     void* pEndPtr = WritePBRPrimitiveShaderAttribs(pAttribsData, AttribsData, !m_Settings.PackMatrixRowMajor, m_Settings.UseSkinPreTransform);
 
                     VERIFY(reinterpret_cast<uint8_t*>(pEndPtr) <= static_cast<uint8_t*>(pAttribsData) + m_PBRPrimitiveAttribsCB->GetDesc().Size,

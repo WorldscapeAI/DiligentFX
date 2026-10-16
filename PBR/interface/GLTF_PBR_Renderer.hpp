@@ -143,6 +143,7 @@ public:
         bool Wireframe = false;
 
         IBufferView* InstanceTransforms = nullptr;
+        IBufferView* InstanceNodeTransforms = nullptr;
         IBuffer* InstanceSlotBuffer = nullptr;
         Uint64 InstanceBufferByteOffset = 0;
         Uint32 InstanceCount = 1;
