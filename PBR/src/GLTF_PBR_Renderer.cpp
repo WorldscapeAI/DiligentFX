@@ -763,6 +763,7 @@ void GLTF_PBR_Renderer::Render(IDeviceContext*              pCtx,
             GLTF::Material::ALPHA_MODE_BLEND,  // Transparent primitives - last (TODO: depth sorting)
         };
 
+    Uint32 InstanceDrawIndex = 0;
     IPipelineState*         pCurrPSO      = nullptr;
     IShaderResourceBinding* pCurrSRB      = nullptr;
     const GLTF::Material*   pCurrMaterial = nullptr;
@@ -902,7 +903,8 @@ void GLTF_PBR_Renderer::Render(IDeviceContext*              pCtx,
                 {
                     const float4x4  NodeTransform     = NodeGlobalMatrix * RenderParams.ModelTransform;
                     const float4x4& PrevNodeTransform = (CurrPsoKey.GetFlags() & PSO_FLAG_COMPUTE_MOTION_VECTORS) != 0 ?
-                        PrevNodeGlobalMatrix * RenderParams.ModelTransform :
+                        PrevNodeGlobalMatrix * (RenderParams.UsePreviousModelTransform
+                            ? RenderParams.PreviousModelTransform : RenderParams.ModelTransform) :
                         NodeTransform;
 
                     PBRPrimitiveShaderAttribsData AttribsData{
@@ -911,8 +913,18 @@ void GLTF_PBR_Renderer::Render(IDeviceContext*              pCtx,
                         &PrevNodeTransform,
                         static_cast<Uint32>(JointCount),
                     };
+                    AttribsData.NodeIndex = static_cast<Uint32>(Node.Index);
                     if (RenderParams.InstanceSlotBuffer != nullptr)
-                        AttribsData.FirstJoint = static_cast<Uint32>(Node.Index);
+                    {
+                        VERIFY(Node.SkinTransformsIndex >= 0 &&
+                            static_cast<Uint32>(Node.SkinTransformsIndex) < RenderParams.InstanceJointOffsetCount &&
+                            RenderParams.InstanceJointOffsets != nullptr,
+                            "Instance skin-joint palette offsets are missing or incomplete.");
+                        if (Node.SkinTransformsIndex >= 0 &&
+                            static_cast<Uint32>(Node.SkinTransformsIndex) < RenderParams.InstanceJointOffsetCount &&
+                            RenderParams.InstanceJointOffsets != nullptr)
+                            AttribsData.FirstJoint = RenderParams.InstanceJointOffsets[Node.SkinTransformsIndex];
+                    }
                     void* pEndPtr = WritePBRPrimitiveShaderAttribs(pAttribsData, AttribsData, !m_Settings.PackMatrixRowMajor, m_Settings.UseSkinPreTransform);
 
                     VERIFY(reinterpret_cast<uint8_t*>(pEndPtr) <= static_cast<uint8_t*>(pAttribsData) + m_PBRPrimitiveAttribsCB->GetDesc().Size,
@@ -965,7 +977,19 @@ void GLTF_PBR_Renderer::Render(IDeviceContext*              pCtx,
                     drawAttrs.BaseVertex         = BaseVertex;
                     if (RenderParams.InstanceSlotBuffer != nullptr)
                         drawAttrs.NumInstances = RenderParams.InstanceCount;
-                    pCtx->DrawIndexed(drawAttrs);
+                    if (RenderParams.InstanceSlotBuffer != nullptr && RenderParams.InstanceDrawArgs != nullptr)
+                    {
+                        DrawIndexedIndirectAttribs indirect;
+                        indirect.IndexType = drawAttrs.IndexType;
+                        indirect.pAttribsBuffer = RenderParams.InstanceDrawArgs;
+                        indirect.DrawArgsOffset = RenderParams.InstanceDrawArgsOffset +
+                            static_cast<Uint64>(InstanceDrawIndex++) * sizeof(Uint32) * 5;
+                        indirect.Flags = DRAW_FLAG_VERIFY_ALL;
+                        indirect.AttribsBufferStateTransitionMode = RESOURCE_STATE_TRANSITION_MODE_TRANSITION;
+                        pCtx->DrawIndexedIndirect(indirect);
+                    }
+                    else
+                        pCtx->DrawIndexed(drawAttrs);
                 }
                 else
                 {
@@ -1155,6 +1179,7 @@ void* GLTF_PBR_Renderer::WritePBRPrimitiveShaderAttribs(void*                   
     //
     //        int   JointCount;
     //        int   FirstJoint;
+    //        int   NodeIndex;
     //        float PosBiasX;
     //        float PosBiasY;
     //
@@ -1203,6 +1228,7 @@ void* GLTF_PBR_Renderer::WritePBRPrimitiveShaderAttribs(void*                   
 
         WriteValue(static_cast<int>(AttribsData.JointCount));
         WriteValue(static_cast<int>(AttribsData.FirstJoint));
+        WriteValue(static_cast<int>(AttribsData.NodeIndex));
 
         const float3& PosBias = AttribsData.PosBias != nullptr ? *AttribsData.PosBias : float3{0, 0, 0};
         WriteValue(PosBias.x);
@@ -1213,6 +1239,10 @@ void* GLTF_PBR_Renderer::WritePBRPrimitiveShaderAttribs(void*                   
         WriteValue(PosScale.x);
         WriteValue(PosScale.y);
         WriteValue(PosScale.z);
+
+        WriteValue(0.0f);
+        WriteValue(0.0f);
+        WriteValue(0.0f);
 
         if (UseSkinPreTransform && (AttribsData.PSOFlags & PSO_FLAG_USE_JOINTS))
         {

@@ -115,6 +115,10 @@ public:
         /// Model transform matrix
         float4x4 ModelTransform = float4x4::Identity();
 
+        /// Previous model transform matrix. Ignored unless UsePreviousModelTransform is true.
+        float4x4 PreviousModelTransform = float4x4::Identity();
+        bool UsePreviousModelTransform = false;
+
         /// Alpha mode flags
         enum ALPHA_MODE_FLAGS : Uint32
         {
@@ -144,6 +148,10 @@ public:
 
         IBufferView* InstanceTransforms = nullptr;
         IBufferView* InstanceNodeTransforms = nullptr;
+        const Uint32* InstanceJointOffsets = nullptr;
+        Uint32 InstanceJointOffsetCount = 0;
+        IBuffer* InstanceDrawArgs = nullptr;
+        Uint64 InstanceDrawArgsOffset = 0;
         IBuffer* InstanceSlotBuffer = nullptr;
         Uint64 InstanceBufferByteOffset = 0;
         Uint32 InstanceCount = 1;
@@ -304,6 +312,7 @@ public:
         const float4x4* PrevNodeMatrix       = nullptr; // #if COMPUTE_MOTION_VECTORS
         Uint32          JointCount           = 0;
         Uint32          FirstJoint           = 0;
+        Uint32          NodeIndex            = 0;
         const float3*   PosScale             = nullptr;
         const float3*   PosBias              = nullptr;
         const float4x4* SkinPreTransform     = nullptr; // #if USE_JOINTS && USE_SKIN_PRE_TRANSFORM

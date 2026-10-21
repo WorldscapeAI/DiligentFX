@@ -2466,6 +2466,7 @@ Uint32 PBR_Renderer::GetPBRPrimitiveAttribsSize(PSO_FLAGS Flags, Uint32 CustomDa
     //
     //        int   JointCount;
     //        int   FirstJoint;
+    //        int   NodeIndex;
     //        float PosBiasX;
     //        float PosBiasY;
     //
@@ -2487,7 +2488,7 @@ Uint32 PBR_Renderer::GetPBRPrimitiveAttribsSize(PSO_FLAGS Flags, Uint32 CustomDa
 
     return (sizeof(float4x4) +                                                   // Transforms.NodeMatrix
             ((Flags & PSO_FLAG_COMPUTE_MOTION_VECTORS) ? sizeof(float4x4) : 0) + // Transforms.PrevNodeMatrix
-            sizeof(int) * 2 + sizeof(float) * 6 +                                // Transforms.JointCount ... Transforms.PosScaleZ
+            sizeof(int) * 3 + sizeof(float) * 9 +                                // Transforms.JointCount ... Transforms.Padding
             (UseSkinPreTransform ? sizeof(float4x4) : 0) +                       // Transforms.SkinPreTransform
             (UsePrevSkinPreTransform ? sizeof(float4x4) : 0) +                   // Transforms.PrevSkinPreTransform
 
