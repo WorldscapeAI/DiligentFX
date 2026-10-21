@@ -57,7 +57,7 @@ struct GltfInstanceRecord
     uint ModelIndex;
     uint PaletteOffset;
     uint Flags;
-    uint Reserved;
+    uint JointPaletteOffset;
 };
 
 StructuredBuffer<GltfInstanceRecord> g_GltfInstances;
@@ -113,6 +113,15 @@ float4x4 GetJointMatrix(int JointIndex, int FirstJoint)
 }
 
 #endif // JOINTS_BUFFER_MODE == JOINTS_BUFFER_MODE_STRUCTURED
+
+#if USE_INSTANCE_TRANSFORMS
+float4x4 GetInstanceJointMatrix(uint JointIndex, uint FirstJoint, bool Previous, GltfInstanceRecord Instance)
+{
+    const GltfNodeTransformRecord JointTransform =
+        g_GltfNodeTransforms[Instance.JointPaletteOffset + FirstJoint + JointIndex];
+    return Previous ? JointTransform.PreviousWorld : JointTransform.World;
+}
+#endif
 
 #endif // MAX_JOINT_COUNT > 0 && USE_JOINTS
 
@@ -197,7 +206,7 @@ void main(in  VSInput  VSIn,
     if ((Instance.Flags & 16u) != 0)
     {
         const GltfNodeTransformRecord NodeTransform =
-            g_GltfNodeTransforms[Instance.PaletteOffset + uint(Primitive.Transforms.FirstJoint)];
+            g_GltfNodeTransforms[Instance.PaletteOffset + uint(Primitive.Transforms.NodeIndex)];
         Transform = mul(mul(NodeTransform.World, Instance.ModelTransform), Instance.World);
 #   if COMPUTE_MOTION_VECTORS
         PrevTransform = mul(mul(NodeTransform.PreviousWorld, Instance.ModelTransform), Instance.PreviousWorld);
@@ -219,6 +228,14 @@ void main(in  VSInput  VSIn,
     {
         // Mesh is skinned
         float4x4 SkinMat = 
+#if USE_INSTANCE_TRANSFORMS
+            (Instance.Flags & 32u) != 0u
+                ? VSIn.Weight0.x * GetInstanceJointMatrix(uint(VSIn.Joint0.x), uint(FirstJoint), false, Instance) +
+                    VSIn.Weight0.y * GetInstanceJointMatrix(uint(VSIn.Joint0.y), uint(FirstJoint), false, Instance) +
+                    VSIn.Weight0.z * GetInstanceJointMatrix(uint(VSIn.Joint0.z), uint(FirstJoint), false, Instance) +
+                    VSIn.Weight0.w * GetInstanceJointMatrix(uint(VSIn.Joint0.w), uint(FirstJoint), false, Instance)
+                :
+#endif
             VSIn.Weight0.x * GetJointMatrix(int(VSIn.Joint0.x), FirstJoint) +
             VSIn.Weight0.y * GetJointMatrix(int(VSIn.Joint0.y), FirstJoint) +
             VSIn.Weight0.z * GetJointMatrix(int(VSIn.Joint0.z), FirstJoint) +
@@ -233,6 +250,14 @@ void main(in  VSInput  VSIn,
 #       if COMPUTE_MOTION_VECTORS
         {
             float4x4 PrevSkinMat = 
+#if USE_INSTANCE_TRANSFORMS
+                (Instance.Flags & 32u) != 0u
+                    ? VSIn.Weight0.x * GetInstanceJointMatrix(uint(VSIn.Joint0.x), uint(FirstJoint), true, Instance) +
+                        VSIn.Weight0.y * GetInstanceJointMatrix(uint(VSIn.Joint0.y), uint(FirstJoint), true, Instance) +
+                        VSIn.Weight0.z * GetInstanceJointMatrix(uint(VSIn.Joint0.z), uint(FirstJoint), true, Instance) +
+                        VSIn.Weight0.w * GetInstanceJointMatrix(uint(VSIn.Joint0.w), uint(FirstJoint), true, Instance)
+                    :
+#endif
                 VSIn.Weight0.x * GetJointMatrix(JointCount + int(VSIn.Joint0.x), FirstJoint) +
                 VSIn.Weight0.y * GetJointMatrix(JointCount + int(VSIn.Joint0.y), FirstJoint) +
                 VSIn.Weight0.z * GetJointMatrix(JointCount + int(VSIn.Joint0.z), FirstJoint) +

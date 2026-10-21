@@ -90,6 +90,7 @@ struct GLTFNodeShaderTransforms
 
 	int   JointCount;
     int   FirstJoint; // Index of the first joint in the joints buffer to start from
+    int   NodeIndex;   // Index of the node transform in the instance palette
     float PosBiasX;   // Bias to apply to the position
     float PosBiasY;
     
@@ -97,6 +98,7 @@ struct GLTFNodeShaderTransforms
     float PosScaleX;  // position (Pos = Pos * PosScale + PosBias)
     float PosScaleY;  // and are applied before the NodeMatrix.
     float PosScaleZ;
+    float3 Padding;
     
 #if USE_JOINTS && USE_SKIN_PRE_TRANSFORM
     float4x4 SkinPreTransform;
