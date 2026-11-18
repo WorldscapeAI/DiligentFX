@@ -1303,6 +1303,11 @@ ShaderMacroHelper PBR_Renderer::DefineMacros(const PSOKey& Key) const
     const PSO_FLAGS PSOFlags = Key.GetFlags();
 
     ShaderMacroHelper Macros;
+#ifdef DILIGENT_DEBUG
+    Macros.Add("SRGB_UTILITIES_DEBUG_ASSERTS", true);
+#else
+    Macros.Add("SRGB_UTILITIES_DEBUG_ASSERTS", false);
+#endif
     Macros.Add("MAX_JOINT_COUNT", m_Settings.JointsBufferMode == JOINTS_BUFFER_MODE_UNIFORM ? static_cast<int>(m_Settings.MaxJointCount) : INT_MAX);
     Macros.Add("JOINTS_BUFFER_MODE_UNIFORM", static_cast<int>(JOINTS_BUFFER_MODE_UNIFORM));
     Macros.Add("JOINTS_BUFFER_MODE_STRUCTURED", static_cast<int>(JOINTS_BUFFER_MODE_STRUCTURED));

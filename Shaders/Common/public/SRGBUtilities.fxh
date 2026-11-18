@@ -1,6 +1,10 @@
 #ifndef _SRGB_UTILITIES_FXH_
 #define _SRGB_UTILITIES_FXH_
 
+#ifndef SRGB_UTILITIES_DEBUG_ASSERTS
+#   define SRGB_UTILITIES_DEBUG_ASSERTS 0
+#endif
+
 float3 SRGBToLinear(float3 sRGB)
 {
     float3 bLess = step(float3(0.04045, 0.04045, 0.04045), sRGB);
@@ -16,6 +20,10 @@ float4 SRGBAToLinear(float4 sRGBA)
 
 float3 FastSRGBToLinear(float3 sRGB)
 {
+#if SRGB_UTILITIES_DEBUG_ASSERTS
+    if (!all(sRGB >= float3(0.0, 0.0, 0.0)))
+        abort();
+#endif
     return pow(sRGB, float3(2.2, 2.2, 2.2));
 }
 
