@@ -16,7 +16,7 @@ float4 SRGBAToLinear(float4 sRGBA)
 
 float3 FastSRGBToLinear(float3 sRGB)
 {
-    return pow(sRGB, float3(2.2, 2.2, 2.2));
+    return pow(max(sRGB, float3(0.0, 0.0, 0.0)), float3(2.2, 2.2, 2.2));
 }
 
 float4 FastSRGBAToLinear(float4 sRGBA)
