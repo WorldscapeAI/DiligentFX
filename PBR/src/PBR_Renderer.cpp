@@ -1304,7 +1304,7 @@ ShaderMacroHelper PBR_Renderer::DefineMacros(const PSOKey& Key) const
 
     ShaderMacroHelper Macros;
 #ifdef DILIGENT_DEBUG
-    Macros.Add("SRGB_UTILITIES_DEBUG_ASSERTS", m_Device.GetDeviceInfo().IsD3DDevice());
+    Macros.Add("SRGB_UTILITIES_DEBUG_ASSERTS", true);
 #else
     Macros.Add("SRGB_UTILITIES_DEBUG_ASSERTS", false);
 #endif
