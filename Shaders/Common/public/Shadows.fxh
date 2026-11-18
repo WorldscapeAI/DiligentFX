@@ -235,8 +235,8 @@ FilteredShadow FilterShadowMap(in ShadowMapAttribs       ShadowAttribs,
     Shadow.fNextCascadeBlendAmount = 0.0;
     Shadow.fLightAmount            = 1.0;
 
-    if (SamplingInfo.iCascadeIdx != ShadowAttribs.iNumCascades)
-    {
+    if (SamplingInfo.iCascadeIdx == ShadowAttribs.iNumCascades)
+        return Shadow;
 
     Shadow.fLightAmount = FilterShadowCascade(ShadowAttribs, tex2DShadowMap, tex2DShadowMap_sampler, f3ddXPosInLightViewSpace, f3ddYPosInLightViewSpace, SamplingInfo);
     
@@ -253,8 +253,6 @@ FilteredShadow FilterShadowMap(in ShadowMapAttribs       ShadowAttribs,
         Shadow.fLightAmount = lerp(Shadow.fLightAmount, NextCascadeShadow, Shadow.fNextCascadeBlendAmount);
     }
 #endif
-
-    }
 
     return Shadow;
 }
