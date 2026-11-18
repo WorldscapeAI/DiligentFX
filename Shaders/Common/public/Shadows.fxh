@@ -95,7 +95,7 @@ CascadeSamplingInfo FindCascade(ShadowMapAttribs ShadowAttribs,
     }
 #else
     [unroll]
-    for(int i=0; i< ((ShadowAttribs.iNumCascades + 3) >> 2); ++i)
+    for(int i=0; i< ((ShadowAttribs.iNumCascades + 3)/4); ++i)
     {
         float4 f4CascadeZEnd = ShadowAttribs.f4CascadeCamSpaceZEnd[i];
         float4 v = float4( f4CascadeZEnd.x < fCameraViewSpaceZ ? 1.0 : 0.0, 
