@@ -22,7 +22,10 @@ float3 FastSRGBToLinear(float3 sRGB)
 {
 #if SRGB_UTILITIES_DEBUG_ASSERTS
     if (!all(sRGB >= float3(0.0, 0.0, 0.0)))
-        abort();
+    {
+        // Return a deterministic failure value instead of relying on unsupported shader aborts.
+        return float3(-1.0, -1.0, -1.0);
+    }
 #endif
     return pow(sRGB, float3(2.2, 2.2, 2.2));
 }
